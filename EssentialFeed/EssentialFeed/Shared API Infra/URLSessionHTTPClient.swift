@@ -22,13 +22,18 @@ public final class URLSessionHTTPClient: HTTPClient {
 	}
 	
 	public func get(from url: URL, completion: @escaping (HTTPClient.Result) -> Void) -> HTTPClientTask {
+		print("===> [URLSessionHTTPClient] get")
 		let task = session.dataTask(with: url) { data, response, error in
+			print("===> [URLSessionHTTPClient] task completed")
 			completion(Result {
 				if let error = error {
+					print("===> [URLSessionHTTPClient] error \(error)")
 					throw error
 				} else if let data = data, let response = response as? HTTPURLResponse {
+					print("===> [URLSessionHTTPClient] data \(data)")
 					return (data, response)
 				} else {
+					print("===> [URLSessionHTTPClient] UnexpectedValuesRepresentation")
 					throw UnexpectedValuesRepresentation()
 				}
 			})
