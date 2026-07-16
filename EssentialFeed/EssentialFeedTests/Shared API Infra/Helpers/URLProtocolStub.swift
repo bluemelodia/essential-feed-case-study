@@ -6,7 +6,10 @@ import Foundation
 
 class URLProtocolStub: URLProtocol {
 	private struct Stub {
-		let onStartLoading: (URLProtocolStub) -> Void
+		let data: Data?
+		let response: URLResponse?
+		let error: Error?
+		let requestObserver: ((URLRequest) -> Void)?
 	}
 	
 	private static var _stub: Stub?
@@ -18,37 +21,13 @@ class URLProtocolStub: URLProtocol {
 	private static let queue = DispatchQueue(label: "URLProtocolStub.queue")
 	
 	static func stub(data: Data?, response: URLResponse?, error: Error?) {
-		stub = Stub(onStartLoading: { urlProtocol in
-			guard let client = urlProtocol.client else { return }
-			
-			if let data {
-				client.urlProtocol(urlProtocol, didLoad: data)
-			}
-			
-			if let response {
-				client.urlProtocol(urlProtocol, didReceive: response, cacheStoragePolicy: .notAllowed)
-			}
-			
-			if let error {
-				client.urlProtocol(urlProtocol, didFailWithError: error)
-			} else {
-				client.urlProtocolDidFinishLoading(urlProtocol)
-			}
-		})
+		stub = Stub(data: data, response: response, error: error, requestObserver: nil)
 	}
 	
 	static func observeRequests(observer: @escaping (URLRequest) -> Void) {
-		stub = Stub(onStartLoading: { urlProtocol in
-			urlProtocol.client?.urlProtocolDidFinishLoading(urlProtocol)
-			
-			observer(urlProtocol.request)
-		})
+		stub = Stub(data: nil, response: nil, error: nil, requestObserver: observer)
 	}
-	
-	static func onStartLoading(observer: @escaping () -> Void) {
-		stub = Stub(onStartLoading: { _ in observer() })
-	}
-	
+
 	static func removeStub() {
 		stub = nil
 	}
@@ -62,7 +41,23 @@ class URLProtocolStub: URLProtocol {
 	}
 	
 	override func startLoading() {
-		URLProtocolStub.stub?.onStartLoading(self)
+		guard let stub = URLProtocolStub.stub else { return }
+
+		if let data = stub.data {
+			client?.urlProtocol(self, didLoad: data)
+		}
+
+		if let response = stub.response {
+			client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+		}
+
+		if let error = stub.error {
+			client?.urlProtocol(self, didFailWithError: error)
+		} else {
+			client?.urlProtocolDidFinishLoading(self)
+		}
+
+		stub.requestObserver?(request)
 	}
 	
 	override func stopLoading() {}
